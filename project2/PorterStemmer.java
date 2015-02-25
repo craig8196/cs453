@@ -15,26 +15,30 @@
 public class PorterStemmer {
 
     public String stem(String str) {
-        // check for zero length
-        if (str.length() > 0) {
-            // all characters must be letters
-            char[] c = str.toCharArray();
-            for (int i = 0; i < c.length; i++) {
-                if (!Character.isLetter(c[i]))
-                    return "Invalid term";
+        try {
+            // check for zero length
+            if (str.length() > 0) {
+                // all characters must be letters
+                char[] c = str.toCharArray();
+                for (int i = 0; i < c.length; i++) {
+                    if (!Character.isLetter(c[i]))
+                        return "Invalid term";
+                }
+            } else {
+                return "No term entered";
             }
-        } else {
-            return "No term entered";
+            str = step1a(str);
+            str = step1b(str);
+            str = step1c(str);
+            str = step2(str);
+            str = step3(str);
+            str = step4(str);
+            str = step5a(str);
+            str = step5b(str);
+            return str;
+        } catch(Exception e) {
+            return str;
         }
-        str = step1a(str);
-        str = step1b(str);
-        str = step1c(str);
-        str = step2(str);
-        str = step3(str);
-        str = step4(str);
-        str = step5a(str);
-        str = step5b(str);
-        return str;
     } // end stem
 
     protected String step1a (String str) {

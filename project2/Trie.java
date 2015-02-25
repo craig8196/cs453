@@ -108,6 +108,10 @@ public class Trie {
                 }
             }
             
+            if(this.children == null) {
+                return null;
+            }
+            
             int childIndex = whichChild(q, index);
             if(children[childIndex] == null) {
                 return null;

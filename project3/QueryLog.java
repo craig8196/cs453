@@ -110,6 +110,8 @@ public class QueryLog {
         }
     }
     
+    // Part of the Noisy Channel Model.
+    // P(e|w)
     public double getProbabilityErrorWordGivenCorrection(String e, String w) {
         double result = 0;
         //~ System.out.println(this.misspelledCounts);

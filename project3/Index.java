@@ -200,6 +200,8 @@ public class Index {
         return result.toString();
     }
     
+    // The second part of the Noisy Channel Model
+    // P(w)
     public double getProbabilityWord(String word) {
         word = TextTools.stemmer.stem(word);
         if(this.tokenCountIndex.containsKey(word)) {

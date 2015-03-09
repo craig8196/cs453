@@ -106,6 +106,13 @@ public class TextTools {
     }
     
     /**
+     * Return same string without apostrophes.
+     */
+    public static String removeApostrophes(String text) {
+        return text.replaceAll("[']+", "");
+    }
+    
+    /**
      * Tokenize the text spliting on spaces and remove any tokens if they
      * are in the stopwords list.
      * Return tokens.

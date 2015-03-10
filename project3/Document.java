@@ -1,7 +1,10 @@
 import java.util.ArrayList;
+import java.util.HashSet;
 import java.util.HashMap;
 import java.util.regex.Pattern;
 import java.util.regex.Matcher;
+import java.util.Collections;
+import java.text.BreakIterator;
 
 
 public class Document {
@@ -78,6 +81,40 @@ public class Document {
     
     public HashMap<String, Integer> getTokenCounts() {
         return this.tokenCounts;
+    }
+    
+    public String getTopNSentences(int n, ArrayList<String> queryParts, HashSet<String> stopwords) {
+        StringBuilder result = new StringBuilder();
+        
+        BreakIterator b = BreakIterator.getSentenceInstance();
+        b.setText(this.text);
+        
+        int prev = 0;
+        int curr = 0;
+        int sentenceNumber = 1;
+        ArrayList<Sentence> sentences = new ArrayList<Sentence>();
+        //~ while((curr = b.next()) != BreakIterator.DONE) {
+            //~ Sentence s = new Sentence(this.text.substring(prev, curr), sentenceNumber);
+            //~ s.score(queryParts, stopwords);
+            //~ sentences.add(s);
+            //~ prev = curr;
+            //~ sentenceNumber++;
+        //~ }
+        String[] temp = this.text.split("[.]");
+        for(int i = 0; i < temp.length; i++) {
+            Sentence s = new Sentence(temp[i], sentenceNumber);
+            s.score(queryParts, stopwords);
+            sentences.add(s);
+        }
+        
+        Collections.sort(sentences);
+        
+        for(int i = 0; i < n && i < sentences.size(); i++) {
+            result.append(sentences.get(i).toString());
+            result.append("... ");
+        }
+        
+        return result.toString();
     }
     
     @Override

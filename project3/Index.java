@@ -191,7 +191,7 @@ public class Index {
         for(int i = 0; i < this.maxDocuments && i < pairs.size(); i++) {
             result.append("Document: " + pairs.get(i).doc.toString() + "\nScore: " + pairs.get(i).score + "\n\n");
             //~ result.append(pairs.get(i).doc.getFirstNChars(96) + "\n\n");
-            result.append(pairs.get(i).doc.getFirstNTokens(24) + "\n\n");
+            result.append(pairs.get(i).doc.getTopNSentences(2, query, this.stopwords) + "\n\n");
             Document d = pairs.get(i).doc;
             //~ System.out.println(d);
             //~ for(int j = 0; j < query.size(); j++)

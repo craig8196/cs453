@@ -290,6 +290,40 @@ public class TextTools {
         return distanceMatrix[lenWord1 - 1][lenWord2 - 1];
     }
     
+    /**
+     * Compute the Levenshtein Distance between two words.
+     * It is the users responsibility to take case of the upper or lower case letters.
+     * word1, word2 -- the words to get the minimal edit distance between; not null
+     * Return the edit distance between the two words.
+     */
+    public static int getWordEditDistance(ArrayList<String> word1, ArrayList<String> word2) {
+        int lenWord1 = word1.size() + 1;
+        int lenWord2 = word2.size() + 1;
+        int[][] distanceMatrix = new int[lenWord1][lenWord2];
+        
+        for(int i = 0; i < lenWord1; i++) {
+            distanceMatrix[i][0] = i;
+        }
+        for(int j = 0; j < lenWord2; j++) {
+            distanceMatrix[0][j] = j;
+        }
+        
+        for(int i = 1; i < lenWord1; i++) {
+            for(int j = 1; j < lenWord2; j++) {
+                int cost = 0;
+                if(!word1.get(i-1).equals(word2.get(j-1))) {
+                    cost = 1;
+                }
+                int value = Math.min(distanceMatrix[i - 1][j] + 1, 
+                                     distanceMatrix[i][j - 1] + 1);
+                value = Math.min(distanceMatrix[i - 1][j - 1] + cost, value);
+                distanceMatrix[i][j] = value;
+            }
+        }
+        
+        return distanceMatrix[lenWord1 - 1][lenWord2 - 1];
+    }
+    
     public static HashSet<String> getDictionary(File wordFile) {
         String text = getText(wordFile);
         text = sanitize(text);

@@ -117,6 +117,10 @@ public class Document {
         return result.toString();
     }
     
+    public ArrayList<String> getUnstemmedWords(HashSet<String> stopwords) {
+        return TextTools.tokenize(TextTools.removeApostrophes(this.text), stopwords, false);
+    }
+    
     @Override
     public int hashCode() {
         return this.name.hashCode();

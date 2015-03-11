@@ -31,10 +31,9 @@ public class Sentence implements Comparable<Sentence> {
         // Number of unique query terms in the sentence
         // Longest continuous run of query words in the sentence
         // Significance factor (density measure) on query words in the sentence
-        // Mine 1: Number of terms in same stem class as query terms.
-        // Mine 2: Negative number of non-query terms between extreme unique terms.
-        // Mine 3: First sentence of paragraph.
-        // Mine 4: Inverse word level edit distance.
+        // Mine 1: Number of terms in same stem class as query terms
+        // Mine 2: Negative number of non-query terms between extreme unique terms
+        // Mine 3: Max Words / Word level edit distance
         HashSet<String> queryWords = new HashSet<String>();
         HashSet<String> stemmedQueryWords = new HashSet<String>();
         for(String s: queryParts) {
@@ -75,11 +74,29 @@ public class Sentence implements Comparable<Sentence> {
         double denominator = (double)Math.abs(indexFirstQueryTerm-indexSecondQueryTerm) + 1.0;
         double significanceFactor = (numQueryTerms*numQueryTerms)/denominator;
         
+        double numberNonQueryTerms = 0.0;
+        if(indexFirstQueryTerm != -1) {
+            for(int j = indexFirstQueryTerm; j != indexSecondQueryTerm; j++) {
+                String token = tokens.get(j);
+                if(!queryWords.contains(token)) {
+                    numberNonQueryTerms++;
+                }
+            }
+        }
+        double editDistance = (double)TextTools.getWordEditDistance(queryParts, tokens);
+        if(editDistance == 0) {
+            editDistance++;
+        }
+        double editDistanceBonus = (double) Math.max(tokens.size(), queryParts.size()) / editDistance;
+        
         result += numQueryTerms;
         result += numUniqueQueryTerms;
         result += maxRun;
         result += significanceFactor;
-        // result += numStemmedQueryTerms;
+        // Mine
+        //~ result += numStemmedQueryTerms;
+        //~ result -= numberNonQueryTerms;
+        result += editDistanceBonus;
         
         this.score = result;
     }
@@ -90,6 +107,8 @@ public class Sentence implements Comparable<Sentence> {
     
     public String toString() {
         String result = this.sentence.trim();
+        System.out.println("Score: " + this.score);
+        System.out.println("Sentence: " + result);
         return result;
     }
     

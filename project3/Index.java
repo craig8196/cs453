@@ -15,14 +15,18 @@ public class Index {
     private HashSet<String> dictionary = null;
     private HashMap<String, HashSet<String>> soundexDictionary = null;
     private int maxDocuments = 5;
-    private int totalTokens = 0;
+    private int totalWords = 0;
     private QueryLog queryLog = null;
+    private String soundexCode = null;
+    private HashSet<String> suggestions = null;
+    private HashMap<String, Integer> unstemmedWordCount = null;
     
     public Index(ArrayList<Document> documents, HashSet<String> stopwords, HashSet<String> dictionary) {
         // Initialize
         this.index = new HashMap<String, HashMap<Document, Integer>>();
         this.documentCountIndex = new HashMap<String, Integer>();
         this.tokenCountIndex = new HashMap<String, Integer>();
+        this.unstemmedWordCount = new HashMap<String, Integer>();
         this.stopwords = stopwords;
         this.setDictionary(dictionary);
         // Gather statistics
@@ -45,7 +49,14 @@ public class Index {
                     this.documentCountIndex.put(token, 1);
                     this.tokenCountIndex.put(token, tokenCounts.get(token));
                 }
-                this.totalTokens++;
+            }
+            ArrayList<String> words = doc.getUnstemmedWords(stopwords);
+            for(String word: words) {
+                if(!this.unstemmedWordCount.containsKey(word)) {
+                    this.unstemmedWordCount.put(word, 0);
+                }
+                this.unstemmedWordCount.put(word, this.unstemmedWordCount.get(word) + 1);
+                this.totalWords++;
             }
             //~ if(Integer.parseInt(doc.toString()) == 101) {
                 //~ first = false;
@@ -86,6 +97,10 @@ public class Index {
      * Return the resulting String.
      */
     public String query(String query) {
+        this.soundexCode = null;
+        this.suggestions = null;
+    
+        String originalQuery = query;
         query = this.correctQuery(query);
         System.out.println(query);
         
@@ -110,7 +125,22 @@ public class Index {
                 }
             }
         }
-        return this.topDocumentsToString(docScores, queryParts);
+        
+        StringBuilder result = new StringBuilder();
+        result.append("<b>Original Query: </b>" + originalQuery + "<br />");
+        result.append("<b>Corrected Query: </b>" + query + "<br />");
+        if(this.soundexCode != null) {
+            result.append("<b>Soundex Code: " + this.soundexCode + "</b><br />");
+        }
+        if(this.suggestions != null) {
+            result.append("<b>Suggested Corrections: /b>");
+            for(String sugg: this.suggestions) {
+                result.append(sugg + " ");
+            }
+            result.append("\n");
+        }
+        result.append("\n");
+        return result.toString() + this.topDocumentsToString(docScores, queryParts);
     }
     
     
@@ -147,8 +177,11 @@ public class Index {
                     if(this.soundexDictionary.containsKey(soundexPart)) {
                         String correction = null;
                         double maxProbability = 0;
-                        for(String candidate: this.soundexDictionary.get(soundexPart)) {
+                        HashSet<String> suggestions = this.soundexDictionary.get(soundexPart);
+                        this.suggestions = new HashSet<String>();
+                        for(String candidate: suggestions) {
                             if(TextTools.getEditDistance(part, candidate) < 3) {
+                                this.suggestions.add(candidate);
                                 double candidateProbability = this.getProbabilityWord(candidate)*this.queryLog.getProbabilityErrorWordGivenCorrection(part, candidate);
                                 if(correction == null || maxProbability < candidateProbability) {
                                     correction = candidate;
@@ -158,6 +191,7 @@ public class Index {
                         }
                         if(correction != null) {
                             queryParts[i] = correction;
+                            this.soundexCode = TextTools.getSoundexCode(correction);
                         }
                     }
                 }
@@ -189,9 +223,9 @@ public class Index {
         Collections.sort(pairs);
         
         for(int i = 0; i < this.maxDocuments && i < pairs.size(); i++) {
-            result.append("Document: " + pairs.get(i).doc.toString() + "\nScore: " + pairs.get(i).score + "\n\n");
+            result.append("<b>Document: " + pairs.get(i).doc.toString() + "</b><br />"); // Score: " + pairs.get(i).score + "\n\n");
             //~ result.append(pairs.get(i).doc.getFirstNChars(96) + "\n\n");
-            result.append(pairs.get(i).doc.getTopNSentences(2, query, this.stopwords) + "\n\n");
+            result.append(pairs.get(i).doc.getTopNSentences(2, query, this.stopwords) + "<br /><br />");
             Document d = pairs.get(i).doc;
             //~ System.out.println(d);
             //~ for(int j = 0; j < query.size(); j++)
@@ -203,9 +237,9 @@ public class Index {
     // The second part of the Noisy Channel Model
     // P(w)
     public double getProbabilityWord(String word) {
-        word = TextTools.stemmer.stem(word);
+        //~ word = TextTools.stemmer.stem(word);
         if(this.tokenCountIndex.containsKey(word)) {
-            return ((double)this.tokenCountIndex.get(word))/((double)this.totalTokens);
+            return ((double)this.unstemmedWordCount.get(word))/((double)this.totalWords);
         } else {
             return 0.0;
         }

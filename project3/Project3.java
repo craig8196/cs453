@@ -38,12 +38,12 @@ public class Project3 {
             "entretainment group",
             "tv axtor",
             "scheduled movie screning",
+            //~ "movie action",
         };
         
         try {
-            PrintWriter writer = new PrintWriter("output.txt", "UTF-8");
+            PrintWriter writer = new PrintWriter("output.html", "UTF-8");
             for(int i = 0; i < queries.length; i++) {
-                writer.println("Query: " + queries[i]);
                 writer.println(index.query(queries[i]));
             }
             writer.close();

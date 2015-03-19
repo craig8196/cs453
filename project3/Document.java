@@ -107,11 +107,18 @@ public class Document {
             sentences.add(s);
         }
         
+        HashSet<String> stemmedQueryParts = new HashSet<String>();
+        for(String s: queryParts) {
+            if(!stopwords.contains(s)) {
+                stemmedQueryParts.add(TextTools.stemmer.stem(s));
+            }
+        }
+        
         Collections.sort(sentences);
         
         for(int i = 0; i < n && i < sentences.size(); i++) {
-            result.append(sentences.get(i).toString());
-            result.append("... ");
+            result.append(sentences.get(i).toString(stemmedQueryParts));
+            result.append(" . . . ");
         }
         
         return result.toString();

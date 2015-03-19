@@ -133,7 +133,7 @@ public class Index {
             result.append("<b>Soundex Code: " + this.soundexCode + "</b><br />");
         }
         if(this.suggestions != null) {
-            result.append("<b>Suggested Corrections: /b>");
+            result.append("<b>Suggested Corrections: </b>");
             for(String sugg: this.suggestions) {
                 result.append(sugg + " ");
             }

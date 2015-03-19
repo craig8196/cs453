@@ -2,6 +2,7 @@ import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.HashMap;
 import java.lang.Math;
+import java.util.regex.Matcher;
 
 public class Sentence implements Comparable<Sentence> {
 
@@ -112,9 +113,39 @@ public class Sentence implements Comparable<Sentence> {
         return result;
     }
     
-    public String toString(ArrayList<String> queryParts) {
-        String result = this.sentence.trim();
-        return result;
+    public String toString(HashSet<String> stemmedQueryParts) {
+        System.out.println("Score: " + this.score);
+        System.out.println("Sentence: " + this.sentence.trim());
+        StringBuilder result = new StringBuilder();
+        String text = this.sentence.trim();
+        
+        int previousIndex = 0;
+        
+        Matcher m = TextTools.p.matcher(text);
+        while(m.find()) {
+            String token = m.group(0);
+            int tokenIndex = m.start(0);
+            String stemmedToken = TextTools.stemmer.stem(TextTools.removeApostrophes(token.toLowerCase()));
+            
+            String preceedingText = text.substring(previousIndex, tokenIndex);
+            result.append(preceedingText);
+            
+            if(stemmedQueryParts.contains(stemmedToken)) {
+                result.append("<b>");
+                result.append(token);
+                result.append("</b>");
+            } else {
+                result.append(token);
+            }
+            
+            previousIndex = tokenIndex + token.length();
+        }
+        
+        String endingText = text.substring(previousIndex, text.length());
+        result.append(endingText);
+        result.append(".");
+        
+        return result.toString();
     }
     
     public int compareTo(Sentence s) {

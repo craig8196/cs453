@@ -137,9 +137,9 @@ public class Index {
             for(String sugg: this.suggestions) {
                 result.append(sugg + " ");
             }
-            result.append("\n");
+            result.append("<br />");
         }
-        result.append("\n");
+        result.append("<br />");
         return result.toString() + this.topDocumentsToString(docScores, queryParts);
     }
     

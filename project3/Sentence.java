@@ -48,55 +48,76 @@ public class Sentence implements Comparable<Sentence> {
         double numStemmedQueryTerms = 0;
         double maxRun = 0;
         double currentRun = 0;
+        double numberNonQueryTerms = 0.0;
         int indexFirstQueryTerm = -1;
         int indexSecondQueryTerm = -1;
         for(int i = 0; i < tokens.size(); i++) {
             String token = tokens.get(i);
             String stem = TextTools.stemmer.stem(token);
-            if(queryWords.contains(token)) {
-                numQueryTerms++;
-                currentRun++;
-                if(indexFirstQueryTerm == -1) {
-                    indexFirstQueryTerm = i;
+            System.out.println(token);
+            System.out.println(stem);
+            if(!stopwords.contains(token)) {
+                if(queryWords.contains(token)) {
+                    numQueryTerms++;
+                    currentRun++;
+                    if(indexFirstQueryTerm == -1) {
+                        indexFirstQueryTerm = i;
+                    }
+                    indexSecondQueryTerm = i;
+                    foundQueryWords.add(token);
+                } else {
+                    if(currentRun > maxRun) {
+                        maxRun = currentRun;
+                    }
+                    currentRun = 0;
                 }
-                indexSecondQueryTerm = i;
-                foundQueryWords.add(token);
-            } else {
-                if(currentRun > maxRun) {
-                    maxRun = currentRun;
+                if(stemmedQueryWords.contains(stem) && !stemmedQueryWords.contains(token)) {
+                    numStemmedQueryTerms++;
                 }
-                currentRun = 0;
-            }
-            if(stemmedQueryWords.contains(stem)) {
-                numStemmedQueryTerms++;
+                if(!stemmedQueryWords.contains(stem)) {
+                    numberNonQueryTerms++;
+                    System.out.println("here2");
+                }
             }
         }
+        
+        if(currentRun > maxRun) {
+            maxRun = currentRun;
+        }
+        
         double numUniqueQueryTerms = (double)foundQueryWords.size();
         double denominator = (double)Math.abs(indexFirstQueryTerm-indexSecondQueryTerm) + 1.0;
         double significanceFactor = (numQueryTerms*numQueryTerms)/denominator;
         
-        double numberNonQueryTerms = 0.0;
-        if(indexFirstQueryTerm != -1) {
-            for(int j = indexFirstQueryTerm; j != indexSecondQueryTerm; j++) {
-                String token = tokens.get(j);
-                if(!queryWords.contains(token)) {
-                    numberNonQueryTerms++;
-                }
-            }
-        }
+        System.out.println(indexFirstQueryTerm);
+        
+        
+        //~ for(int j = indexFirstQueryTerm; j != indexSecondQueryTerm; j++) {
+            //~ String token = tokens.get(j);
+            //~ System.out.println("here");
+            //~ if(!stemmedQueryWords.contains(TextTools.stemmer.stem(token))) {
+                //~ numberNonQueryTerms++;
+            //~ }
+        //~ }
         double editDistance = (double)TextTools.getWordEditDistance(queryParts, tokens);
         if(editDistance == 0) {
             editDistance++;
         }
         double editDistanceBonus = (double) Math.max(tokens.size(), queryParts.size()) / editDistance;
         
+        System.out.println(this.sentence);
         result += numQueryTerms;
+        System.out.println(numQueryTerms);
         result += numUniqueQueryTerms;
+        System.out.println(numUniqueQueryTerms);
         result += maxRun;
+        System.out.println(maxRun);
         result += significanceFactor;
+        System.out.println(significanceFactor);
         // Mine
-        //~ result += numStemmedQueryTerms;
-        //~ result -= numberNonQueryTerms;
+        result += 2*numStemmedQueryTerms;
+        result += Math.max(numQueryTerms, 2.0)/Math.max(numberNonQueryTerms, 1.0);
+        System.out.println(numberNonQueryTerms);
         result += editDistanceBonus;
         
         this.score = result;

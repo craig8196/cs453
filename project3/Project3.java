@@ -39,6 +39,8 @@ public class Project3 {
             "tv axtor",
             "scheduled movie screning",
             //~ "movie action",
+            //~ "cat",
+            //~ "cat in the hat",
         };
         
         try {

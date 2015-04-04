@@ -12,7 +12,7 @@ from os.path import join, isdir
 DEBUG = False
 PRINT = False
 PRINT_RESULTS = True
-PRINT_INFO = True # Don't use while gathering statisticss
+PRINT_INFO = False # Don't use while gathering statisticss
 
 def avg(l):
     """Return the average of a list of numbers."""
@@ -355,16 +355,74 @@ def split_training_and_test(documents, percent_training, seed=None):
     if DEBUG: assert len(documents) == len(training) + len(test)
     return (training, test)
 
+def plot_data(features, stats):
+    import numpy as np
+    import matplotlib.pyplot as plt
+
+    N = len(stats)
+    
+    # feature selection plot
+    
+    x_tick_labels = []
+    for x in features:
+        if x is None:
+            x_tick_labels.append("all")
+        else:
+            x_tick_labels.append(str(x))
+    
+    feature_avgs = [x[0] for x in stats]
+    training_avgs = [x[0] for x in stats]
+    testing_avgs = [x[0] for x in stats]
+
+    ind = np.arange(N)  # the x locations for the groups
+    width = 1/4       # the width of the bars
+    buf = width
+    
+    fig, ax = plt.subplots()
+    rects1 = ax.bar(ind, feature_avgs, width, color='r')
+    rects2 = ax.bar(ind + width, training_avgs, width, color='g')
+    rects3 = ax.bar(ind + 2*width, testing_avgs, width, color='b')
+
+    #~ womenMeans = (25, 32, 34, 20, 25)
+    #~ womenStd =   (3, 5, 2, 3, 3)
+    #~ rects2 = ax.bar(ind+width, womenMeans, width, color='y', yerr=womenStd)
+
+    # add some text for labels, title and axes ticks
+    ax.set_ylabel('Time')
+    ax.set_title('Time to Perform Tasks')
+    ax.set_xticks(ind+width)
+    ax.set_xticklabels(x_tick_labels)
+
+    ax.legend( (rects1[0], rects2[0], rects3[0]), ('Feature Selection Time', 'Training Time', 'Testing Time') )
+
+    def autolabel(rects):
+        # attach some text labels
+        for rect in rects:
+            height = rect.get_height()
+            ax.text(rect.get_x()+rect.get_width()/2., 1.05*height, format(float(height), '.3f'),
+                    ha='center', va='bottom')
+
+    autolabel(rects1)
+    autolabel(rects2)
+    autolabel(rects3)
+
+    plt.show()
+
+
 if __name__ == "__main__":
-    documents = get_20NG_documents()
-    #~ documents = get_test_documents()
+    #~ documents = get_20NG_documents()
+    documents = get_test_documents()
+    
+    if PRINT_RESULTS: print("Number of Documents:", len(documents))
     
     feature_limits = [6200, 12400, 18600, 24800, None]
     #~ feature_limits = [None, 3]
-    #~ feature_limits = [None]
+    #~ feature_limits = [None, 6200]
     
     validation_iterations = 5
     #~ validation_iterations = 1 # 5
+    
+    statistics = []
     
     for vocab_max in feature_limits:
         evaluation = MNBEvaluation()
@@ -374,6 +432,17 @@ if __name__ == "__main__":
             #~ test_set = documents # TODO remove
             evaluation.trainingTimeMeasure(training_set, vocab_max)
             evaluation.accuracyMeasure(test_set)
-        if PRINT_RESULTS: print(evaluation.getAverages())
+        if PRINT_RESULTS: print(unicode(vocab_max) + ', ', ', '.join([unicode(x) for x in evaluation.getAverages()]))
+        statistics.append(evaluation.getAverages())
 
+    #~ plot_data(feature_limits, statistics)
+    #~ data_handle = plt.plot(x, y, marker='+', linestyle='None', color='black', label='Data')
+    #~ zipfs_law_handle = plt.plot(x, y2, color='blue', linestyle='-', label='Zipf')
+    #~ plt.ylabel('Log Probability')
+    #~ plt.xlabel('Log Rank')
+    #~ plt.yscale('log')
+    #~ plt.xscale('log')
+    #~ plt.title('Zipf\'s Law over Bigrams and Words\nK='+unicode(k))
+    #~ plt.show()
+    
 

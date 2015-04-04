@@ -6,13 +6,16 @@ import re
 import math
 import time
 import random
-from os.path import join
-# Multinomial Naive Bayes
+from os.path import join, isdir
+# Multinomial Naive Bayes (MNB)
 
-DEBUG = True
-PRINT = True
+DEBUG = False
+PRINT = False
+PRINT_RESULTS = True
+PRINT_INFO = True # Don't use while gathering statisticss
 
 def avg(l):
+    """Return the average of a list of numbers."""
     return sum(l)/len(l)
 
 
@@ -20,25 +23,103 @@ class MNBClassification(object):
 
     def __init__(self, training_set):
         self.training_set = training_set
-        self.allowed_features = {}
+        self.selected_features = None
 
     def featureSelection(self, vocab_limit=None):
         """vocab_limit -- number of vocab words to select
         self.allowed_features stores the words allowed after featureSelection is complete
         Return nothing.
         """
-        self.probabilities = MNBProbability(self.training_set)
-        self.probabilities.computeWordProbability(set())
-        self.probabilities.computeClassProbability()
-        if vocab_limit is not None:
-            pass
+        if vocab_limit is None:
+            self.selected_features = None
+        else:
+            # num docs
+            c_docs = len(self.training_set)
+            # num docs labeled as c
+            c_c = {}
+            # num docs containing feature w
+            c_w = {}
+            # num docs labeled c containing w
+            c_c_given_w = {}
+            # information gain words
+            ig_w = {}
+            
+            # populate the counts
+            for doc in self.training_set:
+                c = doc.classification
+                c_c[c] = c_c.setdefault(c, 0) + 1
+                words = doc.word_counts
+                for w in words:
+                    c_w[w] = c_w.setdefault(w, 0) + 1
+                    if w not in c_c_given_w:
+                        c_c_given_w[w] = {}
+                    classes = c_c_given_w[w]
+                    classes[c] = classes.setdefault(c, 0) + 1
+                    ig_w[w] = 0 # initialize all words to zero
+            
+            if PRINT_INFO: print("Vocab Size:", len(ig_w))
+            
+            # probability functions
+            def prob_c(c):
+                return c_c.setdefault(c, 0)/c_docs
+            def prob_w(w):
+                return c_w.setdefault(w, 0)/c_docs
+            def prob_not_w(w):
+                return (c_docs - c_w.setdefault(w, 0))/c_docs
+            def prob_c_given_w(c, w):
+                numerator = c_c_given_w[w].setdefault(c, 0)
+                return numerator/c_w.setdefault(w, numerator)
+            def prob_c_given_not_w(c, w):
+                num_in_c = c_c.setdefault(c, 0)
+                numerator = num_in_c - c_c_given_w[w].setdefault(c, 0)
+                denominator = c_docs - c_w.setdefault(w, 0)
+                if denominator == 0.0: return 0
+                if DEBUG: assert numerator/denominator <= 1.0
+                return numerator/denominator
+            
+            # compute scores
+            for w in ig_w:
+                if PRINT: print("IG Word:", w)
+                first_sum = 0
+                second_sum = 0
+                third_sum = 0
+                for c in c_c:
+                    p = prob_c(c)
+                    if PRINT: print("P(c):", "P(%s)="%(c), p)
+                    if p > 0: first_sum += p*math.log(p, 2)
+                    p = prob_c_given_w(c, w)
+                    if PRINT: print("P(c|w):", "P(%s|%s)="%(c,w), p)
+                    if p > 0: second_sum += p*math.log(p, 2)
+                    p = prob_c_given_not_w(c, w)
+                    if PRINT: print("P(c|not w):", "P(%s|not %s)="%(c,w), p)
+                    if p > 0: third_sum += p*math.log(p, 2)
+                if PRINT:
+                    print("P(w):", "P(%s)="%(w), prob_w(w))
+                    print("P(not w):", "P(not %s)="%(w), prob_not_w(w))
+                    print("First Term:", -first_sum)
+                    print("Second Term:", prob_w(w)*second_sum)
+                    print("Third Term:", prob_not_w(w)*third_sum)
+                ig_w[w] = -first_sum + prob_w(w)*second_sum + prob_not_w(w)*third_sum
+            
+            if PRINT: print("IG:", ig_w)
+            
+            # select features
+            feature_scores = [ (w, score) for w, score in ig_w.iteritems() ]
+            feature_scores = sorted(feature_scores, key=lambda x: x[1], reverse=True)
+            selected_features = { w: True for w, score in feature_scores[0:vocab_limit] }
+            
+            if PRINT: print("Selected Features:", selected_features)
+            self.selected_features = selected_features
     
-    def train(self, selected_features):
-        pass
+    def train(self):
+        self.probabilities = MNBProbability(self.training_set)
+        self.probabilities.computeWordProbability(self.selected_features)
+        self.probabilities.computeClassProbability()
+        if PRINT: self.probabilities.pretty_print()
 
     def label(self, test_set):
         """test_set -- list of documents
-        Return list of classification assignments.
+        Return list of class/label assignments.
         """
         results = []
         for test_doc in test_set:
@@ -47,11 +128,18 @@ class MNBClassification(object):
             for c in self.probabilities.class_probabilities:
                 prob = self.probabilities.getClassLogProbability(c)
                 for word, word_count in test_doc.word_counts.iteritems():
-                    prob += word_count*self.probabilities.getWordLogProbability(word, c)
+                    if self.selected_features is None or word in self.selected_features:
+                        prob += word_count*self.probabilities.getWordLogProbability(word, c)
                 if max_class is None or max_prob < prob:
                     max_prob = prob
                     max_class = c
-            results.append(c)
+            results.append(max_class)
+            if PRINT:
+                test_doc.pretty_print()
+                print("Classified as:", max_class)
+                print("Probability:", 2**max_prob)
+                print()
+            
         return results
                 
 
@@ -64,15 +152,19 @@ class Document(object):
         self.word_counts = {}
         self.total_word_count = 0
         self.add_tokens(tokens)
+        if PRINT: self.pretty_print()
 
     def add_tokens(self, tokens):
         for token in tokens:
             self.word_counts[token] = self.word_counts.setdefault(token, 0) + 1
             self.total_word_count += 1
-        if PRINT:
-            print(self)
-            print(self.word_counts)
-            print(self.total_word_count)
+    
+    def pretty_print(self):
+        print("Name:", self)
+        print("Class:", self.classification)
+        print("Total Word Count:", self.total_word_count)
+        print("Word Counts:", self.word_counts)
+        print()
 
     def __unicode__(self):
         return unicode(self.name)
@@ -83,32 +175,12 @@ class Document(object):
     def __repr__(self):
         return unicode(self)
 
-#~ class Counter(object):
-    #~ 
-    #~ def __init__(self, documents):
-        #~ self.original_documents = documents
-        #~ self.total_class_counts = 0 # total number of classes (equals to total number of documents)
-        #~ self.total_class_word_counts = {} # total number of tokens in each class
-        #~ self.class_counts = {} # 
-        #~ self.class_word_counts = {}
-        #~ self.word_counts = {}
-        #~ self._count_all()
-#~ 
-    #~ def _count_all(self):
-        #~ for doc in self.original_documents:
-            #~ self.total_class_counts += 1
-            #~ classification = doc.classification
-            #~ self.class_counts[classification] = self.class_counts.setdefault(classification, 0) + 1
-            #~ for tok, tok_count in doc.word_counts.iteritems():
-                #~ if classification not in self.class_word_counts:
-
-
 class MNBProbability(object):
     
     def __init__(self, documents):
         self.original_documents = documents
 
-    def computeWordProbability(self, allowed_features):
+    def computeWordProbability(self, selected_features=None):
         """Compute probability of each word in each class C.
         Use Laplacian Smoothed Estimate."""
         self.word_probabilities = {}
@@ -123,14 +195,11 @@ class MNBProbability(object):
             w_counts = word_counts[classification]
             total_words_added = 0
             for word, word_count in doc.word_counts.iteritems():
-                if word in allowed_features or not allowed_features:
+                if selected_features is None or word in selected_features:
                     vocab[word] = True
                     w_counts[word] = w_counts.setdefault(word, 0) + word_count
                     total_words_added += word_count
             total_word_counts[classification] = total_word_counts.setdefault(classification, 0) + total_words_added
-        
-        print(word_counts)
-        print(total_word_counts)
         
         for c in total_word_counts:
             denominator = total_word_counts[c] + len(vocab)
@@ -141,7 +210,9 @@ class MNBProbability(object):
                 word_probs[word] = word_count/denominator
             self.word_probabilities[c] = word_probs
             self.junk_word_probabilities[c] = 1/denominator
-        print(self.word_probabilities)
+        
+        self.word_counts = word_counts
+        self.total_word_counts = total_word_counts
 
     def computeClassProbability(self):
         """Compute probability of each class in C."""
@@ -153,7 +224,15 @@ class MNBProbability(object):
             class_counts[c] = class_counts.setdefault(c, 0) + 1
         for c, count in class_counts.iteritems():
             self.class_probabilities[c] = count/total_classes
-        print(self.class_probabilities)
+        self.class_counts = class_counts
+        self.total_classes = total_classes
+    
+    def pretty_print(self):
+        print("Total Classes:", self.total_classes)
+        print("Class Counts:", self.class_counts)
+        print("Total Word Counts by Class:", self.total_word_counts)
+        print("Word Counts by Class:", self.word_counts)
+        print()
 
     def getWordProbability(self, w, given_c):
         word_probs = self.word_probabilities[given_c]
@@ -170,13 +249,6 @@ class MNBProbability(object):
 
     def getClassLogProbability(self, c):
         return math.log(self.getClassProbability(c), 2)
-    
-    #~ def getNonZeroClassLogProbability(self, c):
-        #~ p = self.getClassProbability(c)
-        #~ if p <= 0:
-            #~ return 1.0
-        #~ else:
-            #~ return p
 
 class MNBEvaluation(object):
     
@@ -187,18 +259,15 @@ class MNBEvaluation(object):
         self.accuracies = []
     
     def trainingTimeMeasure(self, training_set, vocab_max=None):
-        """Time the duration of the vocab selection and training time."""
+        """Store the vocab selection and training time."""
         mnb = MNBClassification(training_set)
         
         start = time.time()
-        if vocab_max is None:
-            selected_features = None
-        else:
-            selected_features = mnb.featureSelection(vocab_max)
+        selected_features = mnb.featureSelection(vocab_max)
         self.feature_selection_times.append(time.time() - start)
         
         start = time.time()
-        mnb.train(selected_features)
+        mnb.train()
         self.training_times.append(time.time() - start)
         
         self.mnb = mnb
@@ -238,9 +307,10 @@ def get_test_documents():
     stopwords = set()
     documents = []
     spam = set([2, 4, 5])
+    classifications = { True: "spam", False: "not spam" }
     for i in xrange(1, 11):
         file_name = join(directory, str(i))
-        classification = i in spam
+        classification = classifications[i in spam]
         tokens = get_tokens_from_file(file_name, stopwords)
         document = Document(file_name, classification, tokens)
         documents.append(document)
@@ -248,17 +318,19 @@ def get_test_documents():
 
 
 def get_20NG_documents():
-    # get folders in documents
-    
-    # get file names of the documents
-    # get stopwords
-    stopwords = set(get_tokens_from_file(f, set()))
-    # create the document classes
     documents = []
-    for c, f in files:
-        tokens = get_tokens_from_file(f, stopwords)
-        document = Document(f, c, tokens)
-        documents.append(document)
+    root = 'documents'
+    # get stopwords
+    stopwords = set(get_tokens_from_file('stopwords.txt', set()))
+    # get directories in documents directory
+    classes = [d for d in os.listdir(root) if isdir(join(root, d))]
+    # get tokens and create documents
+    for c in classes:
+        for file_name in os.listdir(join(root, c)):
+            f = join(root, c, file_name)
+            tokens = get_tokens_from_file(f, stopwords)
+            document = Document(f, c, tokens)
+            documents.append(document)
     return documents
 
 def split_training_and_test(documents, percent_training, seed=None):
@@ -280,24 +352,28 @@ def split_training_and_test(documents, percent_training, seed=None):
             training.append(document)
         else:
             test.append(document)
-    assert len(documents) == len(training) + len(test)
+    if DEBUG: assert len(documents) == len(training) + len(test)
     return (training, test)
 
 if __name__ == "__main__":
-    # documents = get_20NG_documents()
-
-    documents = get_test_documents()
-    feature_limits = [None, 6200, 12400, 18600, 24800]
+    documents = get_20NG_documents()
+    #~ documents = get_test_documents()
     
+    feature_limits = [6200, 12400, 18600, 24800, None]
+    #~ feature_limits = [None, 3]
+    #~ feature_limits = [None]
+    
+    validation_iterations = 5
+    #~ validation_iterations = 1 # 5
     
     for vocab_max in feature_limits:
         evaluation = MNBEvaluation()
-        for i in xrange(0, 5):
-            training_set, test_set = split_training_and_test(documents, 0.8, seed=0)
-            training_set = documents
-            test_set = documents
+        for i in xrange(0, validation_iterations):
+            training_set, test_set = split_training_and_test(documents, 0.8, seed=None)
+            #~ training_set = documents # TODO remove
+            #~ test_set = documents # TODO remove
             evaluation.trainingTimeMeasure(training_set, vocab_max)
             evaluation.accuracyMeasure(test_set)
-        print(evaluation.getAverages())
+        if PRINT_RESULTS: print(evaluation.getAverages())
 
 

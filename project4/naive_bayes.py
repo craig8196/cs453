@@ -12,7 +12,7 @@ from os.path import join, isdir
 DEBUG = False
 PRINT = False
 PRINT_RESULTS = True
-PRINT_INFO = False # Don't use while gathering statisticss
+PRINT_INFO = False
 
 def avg(l):
     """Return the average of a list of numbers."""
@@ -180,6 +180,76 @@ class MNBProbability(object):
     def __init__(self, documents):
         self.original_documents = documents
 
+    #~ def computeWordProbability(self, selected_features=None):
+        #~ """Compute probability of each word in each class C.
+        #~ Use Laplacian Smoothed Estimate."""
+        #~ self.word_probabilities = {}
+        #~ self.junk_word_probabilities = {}
+        #~ word_counts = {}
+        #~ total_word_counts = {}
+        #~ vocab = {}
+        #~ for doc in self.original_documents:
+            #~ classification = doc.classification
+            #~ if classification not in word_counts:
+                #~ word_counts[classification] = {}
+            #~ w_counts = word_counts[classification]
+            #~ total_words_added = 0
+            #~ for word, word_count in doc.word_counts.iteritems():
+                #~ if selected_features is None or word in selected_features:
+                    #~ vocab[word] = True
+                    #~ w_counts[word] = w_counts.setdefault(word, 0) + word_count
+                    #~ total_words_added += word_count
+            #~ total_word_counts[classification] = total_word_counts.setdefault(classification, 0) + total_words_added
+        #~ 
+        #~ for c in total_word_counts:
+            #~ denominator = total_word_counts[c] + len(vocab)
+            #~ words = word_counts[c]
+            #~ word_probs = {}
+            #~ for word, word_count in words.iteritems():
+                #~ word_count += 1
+                #~ word_probs[word] = word_count/denominator
+            #~ self.word_probabilities[c] = word_probs
+            #~ self.junk_word_probabilities[c] = 1/denominator
+        #~ 
+        #~ self.word_counts = word_counts
+        #~ self.total_word_counts = total_word_counts
+#~ 
+    #~ def computeClassProbability(self):
+        #~ """Compute probability of each class in C."""
+        #~ self.class_probabilities = {}
+        #~ class_counts = {}
+        #~ total_classes = len(self.original_documents)
+        #~ for doc in self.original_documents:
+            #~ c = doc.classification
+            #~ class_counts[c] = class_counts.setdefault(c, 0) + 1
+        #~ for c, count in class_counts.iteritems():
+            #~ self.class_probabilities[c] = count/total_classes
+        #~ self.class_counts = class_counts
+        #~ self.total_classes = total_classes
+    #~ 
+    #~ def pretty_print(self):
+        #~ print("Total Classes:", self.total_classes)
+        #~ print("Class Counts:", self.class_counts)
+        #~ print("Total Word Counts by Class:", self.total_word_counts)
+        #~ print("Word Counts by Class:", self.word_counts)
+        #~ print()
+#~ 
+    #~ def getWordProbability(self, w, given_c):
+        #~ word_probs = self.word_probabilities[given_c]
+        #~ if w not in word_probs:
+            #~ return self.junk_word_probabilities[given_c]
+        #~ else:
+            #~ return word_probs[w]
+#~ 
+    #~ def getClassProbability(self, c):
+        #~ return self.class_probabilities.setdefault(c, 0)
+#~ 
+    #~ def getWordLogProbability(self, w, given_c):
+        #~ return math.log(self.getWordProbability(w, given_c), 2)
+#~ 
+    #~ def getClassLogProbability(self, c):
+        #~ return math.log(self.getClassProbability(c), 2)
+    
     def computeWordProbability(self, selected_features=None):
         """Compute probability of each word in each class C.
         Use Laplacian Smoothed Estimate."""
@@ -207,9 +277,9 @@ class MNBProbability(object):
             word_probs = {}
             for word, word_count in words.iteritems():
                 word_count += 1
-                word_probs[word] = word_count/denominator
+                word_probs[word] = math.log(word_count/denominator, 2)
             self.word_probabilities[c] = word_probs
-            self.junk_word_probabilities[c] = 1/denominator
+            self.junk_word_probabilities[c] = math.log(1/denominator, 2)
         
         self.word_counts = word_counts
         self.total_word_counts = total_word_counts
@@ -223,7 +293,7 @@ class MNBProbability(object):
             c = doc.classification
             class_counts[c] = class_counts.setdefault(c, 0) + 1
         for c, count in class_counts.iteritems():
-            self.class_probabilities[c] = count/total_classes
+            self.class_probabilities[c] = math.log(count/total_classes, 2)
         self.class_counts = class_counts
         self.total_classes = total_classes
     
@@ -235,20 +305,20 @@ class MNBProbability(object):
         print()
 
     def getWordProbability(self, w, given_c):
+        return 2**self.getWordLogProbability(w, given_c)
+
+    def getClassProbability(self, c):
+        return 2**self.getClassLogProbability(c)
+
+    def getWordLogProbability(self, w, given_c):
         word_probs = self.word_probabilities[given_c]
         if w not in word_probs:
             return self.junk_word_probabilities[given_c]
         else:
             return word_probs[w]
 
-    def getClassProbability(self, c):
-        return self.class_probabilities.setdefault(c, 0)
-
-    def getWordLogProbability(self, w, given_c):
-        return math.log(self.getWordProbability(w, given_c), 2)
-
     def getClassLogProbability(self, c):
-        return math.log(self.getClassProbability(c), 2)
+        return self.class_probabilities.setdefault(c, 0)
 
 class MNBEvaluation(object):
     
@@ -293,10 +363,13 @@ class MNBEvaluation(object):
         return (avg_feature_selection_time, avg_training_time, avg_testing_time, avg_accuracy)
 
 COMPILED_REGEX = re.compile(r"[a-zA-Z']+", re.UNICODE)
-def get_tokens_from_file(file_name, stopwords, compiled_regex=COMPILED_REGEX):
+def get_tokens_from_file(file_name, stopwords, compiled_regex=COMPILED_REGEX, remove_header=False):
     tokens = []
     with io.open(file_name, 'r', encoding='utf-8', errors='ignore') as f:
-        for match in compiled_regex.finditer(f.read()):
+        text = f.read()
+        if remove_header:
+            text = text.split('\n\n', 1)[1]
+        for match in compiled_regex.finditer(text):
             token = match.group().lower()
             if token not in stopwords:
                 tokens.append(token)
@@ -317,7 +390,7 @@ def get_test_documents():
     return documents
 
 
-def get_20NG_documents():
+def get_20NG_documents(use_broader_class=False):
     documents = []
     root = 'documents'
     # get stopwords
@@ -326,11 +399,19 @@ def get_20NG_documents():
     classes = [d for d in os.listdir(root) if isdir(join(root, d))]
     # get tokens and create documents
     for c in classes:
+        count = 0
+        classification = c
+        if use_broader_class:
+            classification = c.split('.')[0]
         for file_name in os.listdir(join(root, c)):
+            count += 1
             f = join(root, c, file_name)
-            tokens = get_tokens_from_file(f, stopwords)
-            document = Document(f, c, tokens)
+            tokens = get_tokens_from_file(f, stopwords, remove_header=True)
+            document = Document(f, classification, tokens)
             documents.append(document)
+        if PRINT_INFO:
+            print("Dir:", c)
+            print("Count:", count)
     return documents
 
 def split_training_and_test(documents, percent_training, seed=None):
@@ -355,94 +436,35 @@ def split_training_and_test(documents, percent_training, seed=None):
     if DEBUG: assert len(documents) == len(training) + len(test)
     return (training, test)
 
-def plot_data(features, stats):
-    import numpy as np
-    import matplotlib.pyplot as plt
-
-    N = len(stats)
-    
-    # feature selection plot
-    
-    x_tick_labels = []
-    for x in features:
-        if x is None:
-            x_tick_labels.append("all")
-        else:
-            x_tick_labels.append(str(x))
-    
-    feature_avgs = [x[0] for x in stats]
-    training_avgs = [x[0] for x in stats]
-    testing_avgs = [x[0] for x in stats]
-
-    ind = np.arange(N)  # the x locations for the groups
-    width = 1/4       # the width of the bars
-    buf = width
-    
-    fig, ax = plt.subplots()
-    rects1 = ax.bar(ind, feature_avgs, width, color='r')
-    rects2 = ax.bar(ind + width, training_avgs, width, color='g')
-    rects3 = ax.bar(ind + 2*width, testing_avgs, width, color='b')
-
-    #~ womenMeans = (25, 32, 34, 20, 25)
-    #~ womenStd =   (3, 5, 2, 3, 3)
-    #~ rects2 = ax.bar(ind+width, womenMeans, width, color='y', yerr=womenStd)
-
-    # add some text for labels, title and axes ticks
-    ax.set_ylabel('Time')
-    ax.set_title('Time to Perform Tasks')
-    ax.set_xticks(ind+width)
-    ax.set_xticklabels(x_tick_labels)
-
-    ax.legend( (rects1[0], rects2[0], rects3[0]), ('Feature Selection Time', 'Training Time', 'Testing Time') )
-
-    def autolabel(rects):
-        # attach some text labels
-        for rect in rects:
-            height = rect.get_height()
-            ax.text(rect.get_x()+rect.get_width()/2., 1.05*height, format(float(height), '.3f'),
-                    ha='center', va='bottom')
-
-    autolabel(rects1)
-    autolabel(rects2)
-    autolabel(rects3)
-
-    plt.show()
-
 
 if __name__ == "__main__":
-    #~ documents = get_20NG_documents()
-    documents = get_test_documents()
+    #~ documents = get_20NG_documents(True)
+    documents = get_20NG_documents(False)
+    #~ documents = get_test_documents()
     
-    if PRINT_RESULTS: print("Number of Documents:", len(documents))
+    if PRINT_INFO: print("Number of Documents:", len(documents))
     
     feature_limits = [6200, 12400, 18600, 24800, None]
-    #~ feature_limits = [None, 3]
+    #~ feature_limits = [None]
     #~ feature_limits = [None, 6200]
     
     validation_iterations = 5
-    #~ validation_iterations = 1 # 5
+    #~ validation_iterations = 1
     
     statistics = []
     
+    pairs = []
+    for i in xrange(0, validation_iterations):
+        pairs.append(split_training_and_test(documents, 0.8, seed=None))
+    
     for vocab_max in feature_limits:
         evaluation = MNBEvaluation()
-        for i in xrange(0, validation_iterations):
-            training_set, test_set = split_training_and_test(documents, 0.8, seed=None)
-            #~ training_set = documents # TODO remove
-            #~ test_set = documents # TODO remove
+        #~ for i in xrange(0, validation_iterations):
+            #~ training_set, test_set = split_training_and_test(documents, 0.8, seed=None)
+        for training_set, test_set in pairs:
             evaluation.trainingTimeMeasure(training_set, vocab_max)
             evaluation.accuracyMeasure(test_set)
         if PRINT_RESULTS: print(unicode(vocab_max) + ', ', ', '.join([unicode(x) for x in evaluation.getAverages()]))
         statistics.append(evaluation.getAverages())
-
-    #~ plot_data(feature_limits, statistics)
-    #~ data_handle = plt.plot(x, y, marker='+', linestyle='None', color='black', label='Data')
-    #~ zipfs_law_handle = plt.plot(x, y2, color='blue', linestyle='-', label='Zipf')
-    #~ plt.ylabel('Log Probability')
-    #~ plt.xlabel('Log Rank')
-    #~ plt.yscale('log')
-    #~ plt.xscale('log')
-    #~ plt.title('Zipf\'s Law over Bigrams and Words\nK='+unicode(k))
-    #~ plt.show()
     
 
